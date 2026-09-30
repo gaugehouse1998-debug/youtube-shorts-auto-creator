@@ -458,6 +458,7 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 // -----------------------------------------------------------------------------
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
+    app.use('/youtube-shorts-auto-creator', express.static('dist'));
     app.use(express.static('dist'));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));

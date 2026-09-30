@@ -3,8 +3,13 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command, mode }) => {
+  const isProduction = mode === 'production' || command === 'build';
+  // Use /youtube-shorts-auto-creator/ for GitHub Pages builds, or allow override via VITE_BASE_PATH
+  const base = process.env.VITE_BASE_PATH || (isProduction ? '/youtube-shorts-auto-creator/' : '/');
+
   return {
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
