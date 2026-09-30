@@ -1,0 +1,6 @@
+{
+  "name": "YouTube Shorts Auto Creator",
+  "description": "Generate high-retention 9:16 vertical YouTube Shorts from a single topic with AI scriptwriting, visuals, voiceover, dynamic captions, preview player, and official YouTube OAuth upload.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
