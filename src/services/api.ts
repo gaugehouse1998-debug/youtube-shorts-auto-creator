@@ -7,26 +7,70 @@ import {
   YouTubeChannel,
 } from '../types/index.ts';
 
-// Configurable API base URL for GitHub Pages frontend deployments (points to your deployed backend)
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  '';
+// Live deployed production backend URL
+export const DEFAULT_PRODUCTION_BACKEND_URL =
+  'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app';
+
+export function getEffectiveApiBaseUrl(): string {
+  // Check user override in localStorage (configured via Settings UI)
+  if (typeof window !== 'undefined') {
+    const userOverride = localStorage.getItem('shorts_custom_backend_url');
+    if (userOverride && userOverride.trim()) {
+      return userOverride.trim().replace(/\/$/, '');
+    }
+  }
+
+  // Check build-time Vite environment variables
+  const envUrl = (
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    ''
+  ).trim();
+  if (envUrl) {
+    return envUrl.replace(/\/$/, '');
+  }
+
+  // When deployed on GitHub Pages (*.github.io), automatically route to the live production backend!
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('github.io') || window.location.hostname.includes('github'))
+  ) {
+    return DEFAULT_PRODUCTION_BACKEND_URL;
+  }
+
+  // Local development / same-origin backend
+  return '';
+}
+
+export function setCustomBackendUrl(url: string | null): void {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      localStorage.setItem('shorts_custom_backend_url', url.trim().replace(/\/$/, ''));
+    } else {
+      localStorage.removeItem('shorts_custom_backend_url');
+    }
+  }
+}
 
 /**
  * Robust JSON fetcher that verifies Content-Type and gracefully handles
  * non-JSON/HTML responses during startup or network hiccups.
  */
 async function safeFetchJson<T>(
-  url: string,
+  endpoint: string,
   options?: RequestInit,
   fallback?: T
 ): Promise<T> {
+  const base = getEffectiveApiBaseUrl();
+  const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
+    ? endpoint
+    : `${base}${endpoint}`;
+
   try {
     const res = await fetch(url, options);
     const contentType = res.headers.get('content-type') || '';
 
-    // If server returned HTML (e.g., during initialization or fallback)
+    // If server returned HTML (e.g. static host 404 or backend startup)
     if (!contentType.includes('application/json')) {
       const text = await res.text();
       if (fallback !== undefined) {
@@ -34,8 +78,8 @@ async function safeFetchJson<T>(
       }
       throw new Error(
         text.startsWith('<!doctype') || text.startsWith('<html')
-          ? `Server returned HTML instead of JSON (${res.status})`
-          : `Unexpected non-JSON response (${res.status})`
+          ? `Backend at ${url} returned HTML instead of JSON (${res.status}). Verify your backend is running.`
+          : `Unexpected non-JSON response from ${url} (${res.status})`
       );
     }
 
@@ -78,6 +122,8 @@ const DEFAULT_SYSTEM_STATUS: SystemStatus = {
     redirectUriConfigured: true,
     youtubeApiConfigured: true,
     redirectUri: '/api/youtube/callback',
+    backendUrl: DEFAULT_PRODUCTION_BACKEND_URL,
+    frontendUrl: 'https://gaugehouse1998-debug.github.io/youtube-shorts-auto-creator',
     connectedChannel: { connected: false },
     statusText: 'Credentials pending in environment variables',
   },
@@ -91,14 +137,14 @@ const DEFAULT_SYSTEM_STATUS: SystemStatus = {
 export const api = {
   async getSystemStatus(): Promise<SystemStatus> {
     return safeFetchJson<SystemStatus>(
-      `${BASE_URL}/api/system/status`,
+      '/api/system/status',
       undefined,
       DEFAULT_SYSTEM_STATUS
     );
   },
 
   async getGoogleAuthUrl(): Promise<string> {
-    const data = await safeFetchJson<{ url: string }>(`${BASE_URL}/api/youtube/auth`);
+    const data = await safeFetchJson<{ url: string }>('/api/youtube/auth');
     return data.url;
   },
 
@@ -114,18 +160,18 @@ export const api = {
       missingConfig?: string[];
       redirectUri?: string;
     }>(
-      `${BASE_URL}/api/youtube/status`,
+      '/api/youtube/status',
       undefined,
       { channel: { connected: false }, isConfigured: false }
     );
   },
 
   async disconnectYouTube(): Promise<void> {
-    await safeFetchJson(`${BASE_URL}/api/youtube/disconnect`, { method: 'POST' });
+    await safeFetchJson('/api/youtube/disconnect', { method: 'POST' });
   },
 
   async createJob(options: GenerationOptions): Promise<ShortJob> {
-    return safeFetchJson<ShortJob>(`${BASE_URL}/api/jobs/create`, {
+    return safeFetchJson<ShortJob>('/api/jobs/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(options),
@@ -133,11 +179,11 @@ export const api = {
   },
 
   async getJob(id: string): Promise<ShortJob> {
-    return safeFetchJson<ShortJob>(`${BASE_URL}/api/jobs/${id}`);
+    return safeFetchJson<ShortJob>(`/api/jobs/${id}`);
   },
 
   async retryJob(id: string): Promise<ShortJob> {
-    return safeFetchJson<ShortJob>(`${BASE_URL}/api/jobs/${id}/retry`, { method: 'POST' });
+    return safeFetchJson<ShortJob>(`/api/jobs/${id}/retry`, { method: 'POST' });
   },
 
   async updateJobMetadata(
@@ -149,7 +195,7 @@ export const api = {
       fullNarration?: string;
     }
   ): Promise<ShortJob> {
-    return safeFetchJson<ShortJob>(`${BASE_URL}/api/jobs/${id}/update-metadata`, {
+    return safeFetchJson<ShortJob>(`/api/jobs/${id}/update-metadata`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -162,7 +208,7 @@ export const api = {
     customPrompt?: string
   ): Promise<{ thumbnailUrl: string; prompt: string }> {
     return safeFetchJson<{ thumbnailUrl: string; prompt: string }>(
-      `${BASE_URL}/api/jobs/${jobId}/thumbnail`,
+      `/api/jobs/${jobId}/thumbnail`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,7 +222,7 @@ export const api = {
     visibility: UploadVisibility,
     scheduledAt?: string
   ): Promise<UploadRecord> {
-    return safeFetchJson<UploadRecord>(`${BASE_URL}/api/youtube/upload`, {
+    return safeFetchJson<UploadRecord>('/api/youtube/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId, visibility, scheduledAt }),
@@ -185,13 +231,14 @@ export const api = {
 
   async getHistory(): Promise<{ history: UploadRecord[]; jobs: ShortJob[] }> {
     return safeFetchJson<{ history: UploadRecord[]; jobs: ShortJob[] }>(
-      `${BASE_URL}/api/history`,
+      '/api/history',
       undefined,
       { history: [], jobs: [] }
     );
   },
 
   getAudioUrl(videoId: string): string {
-    return `${BASE_URL}/api/audio/${videoId}.wav`;
+    const base = getEffectiveApiBaseUrl();
+    return `${base}/api/audio/${videoId}.wav`;
   },
 };

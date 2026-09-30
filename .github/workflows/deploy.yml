@@ -37,6 +37,7 @@ jobs:
       - name: Build frontend production bundle
         env:
           VITE_BASE_PATH: /youtube-shorts-auto-creator/
+          VITE_API_BASE_URL: https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app
         run: npm run build
 
       - name: Setup Pages

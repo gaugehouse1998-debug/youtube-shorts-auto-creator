@@ -97,6 +97,14 @@ app.get('/api/system/status', (req: Request, res: Response) => {
       redirectUriConfigured: !!youtubeService.redirectUri,
       youtubeApiConfigured: true,
       redirectUri: youtubeService.redirectUri,
+      backendUrl:
+        process.env.APP_URL && process.env.APP_URL.startsWith('http')
+          ? process.env.APP_URL
+          : 'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app',
+      frontendUrl:
+        process.env.FRONTEND_URL && process.env.FRONTEND_URL.startsWith('http')
+          ? process.env.FRONTEND_URL
+          : 'https://gaugehouse1998-debug.github.io/youtube-shorts-auto-creator',
       connectedChannel: youtubeService.getCurrentChannel(),
       statusText: isConfigured
         ? 'Google Cloud OAuth 2.0 Ready'
@@ -121,11 +129,47 @@ app.get('/api/system/status', (req: Request, res: Response) => {
 
 // Handler for initiating Google OAuth flow
 const handleGetAuthUrl = (req: Request, res: Response) => {
+  const wantsRedirect = req.query.redirect === 'true' || (!req.xhr && req.headers.accept?.includes('text/html'));
+
+  if (!youtubeService.isOAuthCredentialsConfigured()) {
+    const missing = youtubeService.getMissingConfig();
+    const errorMsg = `Google OAuth credentials pending on backend: ${missing.join(', ')}. Please configure valid GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend environment variables.`;
+
+    if (wantsRedirect) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>OAuth Setup Required</title></head>
+          <body style="font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;background:#0f172a;color:#fff;">
+            <div style="max-width:520px;margin:0 auto;background:#1e293b;padding:32px;border-radius:20px;border:1px solid #f59e0b;text-align:left;">
+              <h2 style="color:#f59e0b;margin-top:0;">⚠️ Google OAuth Setup Required</h2>
+              <p style="color:#cbd5e1;font-size:14px;line-height:1.6;">${errorMsg}</p>
+              <p style="color:#94a3b8;font-size:13px;">Authorized Redirect URI configured: <code style="color:#fcd34d;">${youtubeService.redirectUri}</code></p>
+              <div style="margin-top:24px;text-align:center;">
+                <button onclick="window.close()" style="padding:10px 24px;border-radius:12px;background:#3b82f6;color:#fff;border:none;font-weight:600;cursor:pointer;">Close Window</button>
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    return res.status(400).json({
+      error: errorMsg,
+      isConfigured: false,
+      missingConfig: missing,
+      redirectUri: youtubeService.redirectUri,
+    });
+  }
+
   try {
     const authUrl = youtubeService.getAuthorizationUrl();
-    res.json({ url: authUrl });
+    if (wantsRedirect) {
+      return res.redirect(authUrl);
+    }
+    return res.json({ url: authUrl });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message, isConfigured: false });
   }
 };
 
@@ -138,6 +182,10 @@ const handleOAuthCallback = async (req: Request, res: Response) => {
   const state = req.query.state as string;
   const error = req.query.error as string;
   const errorDesc = req.query.error_description as string;
+  const frontendUrl = (
+    process.env.FRONTEND_URL ||
+    'https://gaugehouse1998-debug.github.io/youtube-shorts-auto-creator'
+  ).replace(/\/$/, '');
 
   if (error) {
     const isDenied = error === 'access_denied';
@@ -191,10 +239,12 @@ const handleOAuthCallback = async (req: Request, res: Response) => {
             <p style="color:#fff;font-size:18px;font-weight:bold;margin:0 0 20px 0;">${channel.title}</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'YOUTUBE_AUTH_SUCCESS', channel: ${JSON.stringify(channel)} }, '*');
-                setTimeout(() => window.close(), 1000);
+                try {
+                  window.opener.postMessage({ type: 'YOUTUBE_AUTH_SUCCESS', channel: ${JSON.stringify(channel)} }, '*');
+                } catch(e) {}
+                setTimeout(() => window.close(), 1200);
               } else {
-                window.location.href = '/?auth=success';
+                window.location.href = '${frontendUrl}/?auth=success';
               }
             </script>
             <p style="font-size:12px;color:#64748b;">Closing window and returning to app...</p>

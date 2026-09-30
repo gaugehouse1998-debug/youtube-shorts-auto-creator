@@ -38,13 +38,14 @@ export class YouTubeService {
   }
 
   get redirectUri(): string {
-    if (process.env.GOOGLE_REDIRECT_URI && process.env.GOOGLE_REDIRECT_URI.trim()) {
-      return process.env.GOOGLE_REDIRECT_URI.trim();
+    const explicit = (process.env.GOOGLE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI || '').trim();
+    if (explicit && (explicit.startsWith('http://') || explicit.startsWith('https://'))) {
+      return explicit;
     }
-    if (process.env.YOUTUBE_REDIRECT_URI && process.env.YOUTUBE_REDIRECT_URI.trim()) {
-      return process.env.YOUTUBE_REDIRECT_URI.trim();
-    }
-    const appUrl = (process.env.APP_URL || 'http://localhost:3000').trim().replace(/\/$/, '');
+    const appUrl = (
+      process.env.APP_URL ||
+      'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app'
+    ).trim().replace(/\/$/, '');
     return `${appUrl}/api/youtube/callback`;
   }
 
@@ -53,11 +54,21 @@ export class YouTubeService {
   }
 
   isClientIdConfigured(): boolean {
-    return !!this.clientId && this.clientId !== 'your-google-oauth-client-id.apps.googleusercontent.com';
+    return (
+      !!this.clientId &&
+      this.clientId !== '1234' &&
+      !this.clientId.startsWith('your-') &&
+      this.clientId.includes('.apps.googleusercontent.com')
+    );
   }
 
   isClientSecretConfigured(): boolean {
-    return !!this.clientSecret && this.clientSecret !== 'your-google-oauth-client-secret';
+    return (
+      !!this.clientSecret &&
+      this.clientSecret !== '1234' &&
+      !this.clientSecret.startsWith('your-') &&
+      this.clientSecret.length >= 10
+    );
   }
 
   isOAuthCredentialsConfigured(): boolean {
@@ -66,7 +77,7 @@ export class YouTubeService {
 
   getMissingConfig(): string[] {
     const missing: string[] = [];
-    if (!this.isClientIdConfigured()) missing.push('GOOGLE_CLIENT_ID');
+    if (!this.isClientIdConfigured()) missing.push('GOOGLE_CLIENT_ID (must end with .apps.googleusercontent.com)');
     if (!this.isClientSecretConfigured()) missing.push('GOOGLE_CLIENT_SECRET');
     return missing;
   }

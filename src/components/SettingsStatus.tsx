@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SlidersHorizontal,
   CheckCircle2,
@@ -11,10 +11,18 @@ import {
   ShieldCheck,
   Copy,
   XCircle,
-  HelpCircle,
   KeyRound,
+  ExternalLink,
+  Globe,
+  RefreshCw,
 } from 'lucide-react';
 import { SystemStatus, YouTubeChannel } from '../types/index.ts';
+import {
+  getEffectiveApiBaseUrl,
+  setCustomBackendUrl,
+  DEFAULT_PRODUCTION_BACKEND_URL,
+  api,
+} from '../services/api.ts';
 
 interface SettingsStatusProps {
   status: SystemStatus | null;
@@ -29,7 +37,18 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
   onConnectYouTube,
   onDisconnectYouTube,
 }) => {
-  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [currentBackendUrl, setCurrentBackendUrl] = useState('');
+  const [inputBackendUrl, setInputBackendUrl] = useState('');
+  const [backendTestStatus, setBackendTestStatus] = useState<string | null>(null);
+  const [isTestingBackend, setIsTestingBackend] = useState(false);
+
+  useEffect(() => {
+    const effective = getEffectiveApiBaseUrl();
+    const finalUrl = effective || DEFAULT_PRODUCTION_BACKEND_URL;
+    setCurrentBackendUrl(finalUrl);
+    setInputBackendUrl(finalUrl);
+  }, []);
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -37,15 +56,51 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const frontendUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`
+      : 'https://gaugehouse1998-debug.github.io/youtube-shorts-auto-creator';
+
+  const backendUrl = currentBackendUrl || DEFAULT_PRODUCTION_BACKEND_URL;
+
   const redirectUri =
-    status?.youtubeOAuth?.redirectUri ||
-    'https://your-backend.run.app/api/youtube/callback';
+    status?.youtubeOAuth?.redirectUri && status.youtubeOAuth.redirectUri.startsWith('http')
+      ? status.youtubeOAuth.redirectUri
+      : `${backendUrl.replace(/\/$/, '')}/api/youtube/callback`;
 
   const clientIdConfigured = status?.youtubeOAuth?.clientIdConfigured ?? false;
   const clientSecretConfigured = status?.youtubeOAuth?.clientSecretConfigured ?? false;
-  const redirectUriConfigured = status?.youtubeOAuth?.redirectUriConfigured ?? true;
   const youtubeApiConfigured = status?.youtubeOAuth?.youtubeApiConfigured ?? true;
   const isFullyConfigured = clientIdConfigured && clientSecretConfigured;
+
+  const handleSaveCustomBackend = async () => {
+    setIsTestingBackend(true);
+    setBackendTestStatus('Connecting...');
+    try {
+      const testUrl = inputBackendUrl.trim().replace(/\/$/, '');
+      const res = await fetch(`${testUrl}/api/system/status`);
+      if (res.ok) {
+        setCustomBackendUrl(testUrl);
+        setCurrentBackendUrl(testUrl);
+        setBackendTestStatus('Connected successfully! Reloading status...');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        setBackendTestStatus(`Server responded with HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      setBackendTestStatus(`Connection error: ${err.message}`);
+    } finally {
+      setIsTestingBackend(false);
+    }
+  };
+
+  const handleResetBackend = () => {
+    setCustomBackendUrl(null);
+    setCurrentBackendUrl(DEFAULT_PRODUCTION_BACKEND_URL);
+    setInputBackendUrl(DEFAULT_PRODUCTION_BACKEND_URL);
+    setBackendTestStatus('Reset to default backend. Reloading...');
+    setTimeout(() => window.location.reload(), 800);
+  };
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
@@ -54,18 +109,18 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
         <div className="flex items-center gap-2 text-xs font-bold text-red-500 uppercase tracking-wider mb-1">
           <span>Settings</span>
           <span>→</span>
-          <span>YouTube Integration</span>
+          <span>YouTube OAuth Integration</span>
         </div>
         <h2 className="text-2xl font-extrabold text-white flex items-center gap-2.5">
           <SlidersHorizontal className="w-6 h-6 text-red-500" />
-          <span>System & API Configuration Status</span>
+          <span>YouTube OAuth & System Status</span>
         </h2>
         <p className="text-sm text-slate-400 mt-1">
-          Monitor your modular AI pipeline providers, YouTube OAuth 2.0 integration, and backend services.
+          Monitor your official Google Cloud OAuth 2.0 configuration, live backend connection, and modular video pipeline.
         </p>
       </div>
 
-      {/* SECTION: Settings -> YouTube Integration */}
+      {/* SECTION: Google Cloud Setup & YouTube OAuth Configuration */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3.5">
@@ -74,7 +129,7 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-white">YouTube Integration</h3>
+                <h3 className="text-lg font-bold text-white">YouTube OAuth Configuration</h3>
                 <span
                   className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                     isFullyConfigured
@@ -82,11 +137,11 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
                       : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                   }`}
                 >
-                  {isFullyConfigured ? 'Ready for Authentication' : 'Setup Required'}
+                  {isFullyConfigured ? 'OAuth Credentials Ready' : 'Setup Required'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Official Google OAuth 2.0 server-side authentication and YouTube Data API v3 upload engine
+                Official Google Cloud Console Web Application credentials and server-side token exchange
               </p>
             </div>
           </div>
@@ -111,15 +166,81 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
           </div>
         </div>
 
-        {/* OAuth Configuration 4-Point Checklist */}
+        {/* 1. Environment & URL Diagnostics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+          {/* Frontend URL */}
+          <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-750 space-y-1.5">
+            <div className="flex items-center justify-between text-slate-400 font-sans">
+              <span className="font-bold flex items-center gap-1.5 text-slate-300">
+                <Globe className="w-4 h-4 text-blue-400" />
+                <span>Frontend URL (GitHub Pages)</span>
+              </span>
+              <button
+                onClick={() => copyToClipboard(frontendUrl, 'frontend')}
+                className="text-red-400 hover:text-red-300 flex items-center gap-1 text-[11px] font-semibold"
+              >
+                <Copy className="w-3 h-3" />
+                <span>{copiedField === 'frontend' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 select-all break-all">
+              {frontendUrl}
+            </div>
+          </div>
+
+          {/* Backend URL */}
+          <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-750 space-y-1.5">
+            <div className="flex items-center justify-between text-slate-400 font-sans">
+              <span className="font-bold flex items-center gap-1.5 text-slate-300">
+                <Server className="w-4 h-4 text-emerald-400" />
+                <span>Backend URL (Live Deployed Backend)</span>
+              </span>
+              <button
+                onClick={() => copyToClipboard(backendUrl, 'backend')}
+                className="text-red-400 hover:text-red-300 flex items-center gap-1 text-[11px] font-semibold"
+              >
+                <Copy className="w-3 h-3" />
+                <span>{copiedField === 'backend' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 select-all break-all">
+              {backendUrl}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Official OAuth Redirect URI (Prominent) */}
+        <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/30 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-red-300 flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-red-400" />
+              <span>OAuth Redirect URI (Add this exact URI to Google Cloud Console):</span>
+            </span>
+            <button
+              onClick={() => copyToClipboard(redirectUri, 'redirect')}
+              className="text-red-400 hover:text-red-300 flex items-center gap-1 text-[11px] font-bold"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedField === 'redirect' ? 'Copied to Clipboard!' : 'Copy Redirect URI'}</span>
+            </button>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-amber-300 select-all break-all">
+            {redirectUri}
+          </div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            In Google Cloud Console under <strong>APIs & Services &gt; Credentials &gt; OAuth 2.0 Client IDs</strong>, paste this exact string under <strong>Authorized redirect URIs</strong>.
+          </p>
+        </div>
+
+        {/* 3. OAuth Configuration Status Checklist */}
         <div>
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
             <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-            <span>OAuth Configuration Checklist</span>
+            <span>Credentials Status Checklist</span>
           </h4>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            {/* 1. Client ID */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            {/* Client ID */}
             <div
               className={`p-3.5 rounded-2xl border transition-all ${
                 clientIdConfigured
@@ -135,12 +256,15 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
                   <XCircle className="w-4 h-4 text-rose-400" />
                 )}
               </div>
-              <span className="text-[11px] block text-slate-400">
-                {clientIdConfigured ? '✓ Client ID configured' : '✗ Missing in backend .env'}
+              <span className="text-[11px] block font-semibold">
+                {clientIdConfigured ? 'Configured ✓' : 'Missing ✕'}
+              </span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">
+                {clientIdConfigured ? 'Valid Google OAuth ID' : 'Requires .apps.googleusercontent.com in backend'}
               </span>
             </div>
 
-            {/* 2. Client Secret */}
+            {/* Client Secret */}
             <div
               className={`p-3.5 rounded-2xl border transition-all ${
                 clientSecretConfigured
@@ -156,36 +280,15 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
                   <XCircle className="w-4 h-4 text-rose-400" />
                 )}
               </div>
-              <span className="text-[11px] block text-slate-400">
-                {clientSecretConfigured ? '✓ Client Secret configured' : '✗ Missing in backend .env'}
+              <span className="text-[11px] block font-semibold">
+                {clientSecretConfigured ? 'Configured ✓' : 'Missing ✕'}
               </span>
-              <span className="text-[9px] text-slate-500 block mt-0.5">
-                (Never exposed to frontend)
-              </span>
-            </div>
-
-            {/* 3. Redirect URI */}
-            <div
-              className={`p-3.5 rounded-2xl border transition-all ${
-                redirectUriConfigured
-                  ? 'bg-emerald-500/5 border-emerald-500/30 text-emerald-300'
-                  : 'bg-rose-500/5 border-rose-500/30 text-rose-300'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold">Redirect URI</span>
-                {redirectUriConfigured ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-rose-400" />
-                )}
-              </div>
-              <span className="text-[11px] block text-slate-400">
-                ✓ Redirect URI configured
+              <span className="text-[10px] text-slate-500 block mt-0.5">
+                (Stored securely on backend; never shown in UI)
               </span>
             </div>
 
-            {/* 4. YouTube Data API */}
+            {/* YouTube Data API */}
             <div
               className={`p-3.5 rounded-2xl border transition-all ${
                 youtubeApiConfigured
@@ -194,39 +297,24 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="font-bold">YouTube Data API</span>
+                <span className="font-bold">YouTube API</span>
                 {youtubeApiConfigured ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 ) : (
                   <XCircle className="w-4 h-4 text-rose-400" />
                 )}
               </div>
-              <span className="text-[11px] block text-slate-400">
-                ✓ YouTube Data API configured
+              <span className="text-[11px] block font-semibold">
+                {youtubeApiConfigured ? 'Configured ✓' : 'Missing ✕'}
+              </span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">
+                YouTube Data API v3 enabled
               </span>
             </div>
           </div>
         </div>
 
-        {/* If Missing Credentials, Developer Setup Notice */}
-        {!isFullyConfigured && (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-bold text-amber-100">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Developer Setup Notice: Google OAuth credentials required</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              To connect your real YouTube channel, create a Web Application in your Google Cloud Console and define these variables in your backend environment:
-            </p>
-            <div className="p-3 rounded-xl bg-slate-950 font-mono text-[11px] text-amber-300 space-y-1">
-              <div>GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"</div>
-              <div>GOOGLE_CLIENT_SECRET="your-client-secret"</div>
-              <div>GOOGLE_REDIRECT_URI="{redirectUri}"</div>
-            </div>
-          </div>
-        )}
-
-        {/* Connected Channel Info Card */}
+        {/* 4. Connected YouTube Channel Card */}
         {channel.connected ? (
           <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -247,44 +335,76 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
                   <span className="text-emerald-400 text-xs font-semibold">YouTube Connected ✓</span>
                 </div>
                 <div className="text-xs text-slate-400 flex items-center gap-3 mt-0.5">
+                  <span>Channel ID: {channel.channelId || 'Connected via OAuth'}</span>
+                  <span>•</span>
                   <span>{channel.customUrl || '@creator'}</span>
                   <span>•</span>
                   <span>{Number(channel.subscriberCount || 0).toLocaleString()} subscribers</span>
-                  <span>•</span>
-                  <span>Scope: youtube.upload</span>
                 </div>
               </div>
             </div>
 
             <button
               onClick={onDisconnectYouTube}
-              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30"
+              className="px-3.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30"
             >
-              Disconnect
+              Disconnect YouTube
             </button>
           </div>
         ) : (
           <div className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-750 text-xs text-slate-400 flex items-center justify-between">
             <span>No YouTube channel currently connected.</span>
-            <span className="text-slate-500 font-mono">Requires Google OAuth Sign-in</span>
+            <button
+              onClick={onConnectYouTube}
+              className="text-red-400 hover:text-red-300 font-bold"
+            >
+              Connect with Google →
+            </button>
           </div>
         )}
 
-        {/* Authorized Redirect URI copy box */}
-        <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-750 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-300">
-            <span className="font-semibold">Authorized Redirect URI (configure this in Google Cloud Console):</span>
+        {/* 5. Custom Backend URL Switcher / Override */}
+        <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-750 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Server className="w-3.5 h-3.5 text-blue-400" />
+                <span>Backend API Connection Settings</span>
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                The GitHub Pages frontend routes all API calls and OAuth requests to this backend.
+              </p>
+            </div>
             <button
-              onClick={() => copyToClipboard(redirectUri, 'redirect')}
-              className="text-red-400 hover:text-red-300 flex items-center gap-1 text-[11px] font-semibold"
+              type="button"
+              onClick={handleResetBackend}
+              className="text-[11px] text-slate-400 hover:text-white underline"
             >
-              <Copy className="w-3 h-3" />
-              <span>{copiedField === 'redirect' ? 'Copied!' : 'Copy URI'}</span>
+              Reset to Live Default
             </button>
           </div>
-          <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-amber-300 select-all truncate">
-            {redirectUri}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputBackendUrl}
+              onChange={(e) => setInputBackendUrl(e.target.value)}
+              placeholder="https://your-backend.run.app"
+              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+            />
+            <button
+              type="button"
+              onClick={handleSaveCustomBackend}
+              disabled={isTestingBackend}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+            >
+              {isTestingBackend ? 'Testing...' : 'Update & Test'}
+            </button>
           </div>
+
+          {backendTestStatus && (
+            <p className="text-xs text-amber-300 font-mono">{backendTestStatus}</p>
+          )}
         </div>
       </div>
 
@@ -440,10 +560,10 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
         <div className="space-y-1 text-xs text-slate-400">
           <h4 className="text-sm font-bold text-white">Security & Privacy Architecture</h4>
           <p>
-            • No Google passwords are ever requested or stored. All YouTube channel access strictly uses official Google OAuth 2.0 tokens with state verification.
+            • No Google passwords are ever requested or stored. All YouTube channel access strictly uses official Google OAuth 2.0 tokens with CSRF state verification.
           </p>
           <p>
-            • OAuth client secrets and credentials reside exclusively on the server side and are NEVER bundled into client JavaScript.
+            • OAuth client secrets and credentials reside exclusively on the server side and are NEVER bundled into client JavaScript or GitHub Pages.
           </p>
           <p>
             • Minimum required scope used: <code className="text-slate-300">https://www.googleapis.com/auth/youtube.upload</code>.

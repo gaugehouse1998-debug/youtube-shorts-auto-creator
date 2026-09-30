@@ -168,6 +168,8 @@ export interface SystemStatus {
     redirectUriConfigured: boolean;
     youtubeApiConfigured: boolean;
     redirectUri: string;
+    backendUrl?: string;
+    frontendUrl?: string;
     connectedChannel: YouTubeChannel;
     statusText: string;
     errorDetails?: string;
