@@ -21,6 +21,16 @@ export default defineConfig(({ command, mode }) => {
         '@': path.resolve(rootDir, '.'),
       },
     },
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/index.js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name].[ext]',
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
