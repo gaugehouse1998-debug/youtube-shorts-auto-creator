@@ -11,13 +11,33 @@ import {
 export const DEFAULT_PRODUCTION_BACKEND_URL =
   'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app';
 
+export function isValidHttpUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (
+    trimmed === '1234' ||
+    trimmed === 'undefined' ||
+    trimmed === 'null' ||
+    trimmed.startsWith('your-') ||
+    trimmed.startsWith('your_')
+  ) {
+    return false;
+  }
+  return trimmed.startsWith('https://') || trimmed.startsWith('http://');
+}
+
 export function getEffectiveApiBaseUrl(): string {
   // Check user override in localStorage (configured via Settings UI)
   if (typeof window !== 'undefined') {
-    const userOverride = localStorage.getItem('shorts_custom_backend_url');
-    if (userOverride && userOverride.trim()) {
-      return userOverride.trim().replace(/\/$/, '');
-    }
+    try {
+      const userOverride = localStorage.getItem('shorts_custom_backend_url');
+      if (isValidHttpUrl(userOverride)) {
+        return userOverride!.trim().replace(/\/$/, '');
+      } else if (userOverride) {
+        // Automatically clear invalid / placeholder strings such as '1234'
+        localStorage.removeItem('shorts_custom_backend_url');
+      }
+    } catch (e) {}
   }
 
   // Check build-time Vite environment variables
@@ -26,7 +46,7 @@ export function getEffectiveApiBaseUrl(): string {
     import.meta.env.VITE_API_URL ||
     ''
   ).trim();
-  if (envUrl) {
+  if (isValidHttpUrl(envUrl)) {
     return envUrl.replace(/\/$/, '');
   }
 
@@ -44,11 +64,13 @@ export function getEffectiveApiBaseUrl(): string {
 
 export function setCustomBackendUrl(url: string | null): void {
   if (typeof window !== 'undefined') {
-    if (url && url.trim()) {
-      localStorage.setItem('shorts_custom_backend_url', url.trim().replace(/\/$/, ''));
-    } else {
-      localStorage.removeItem('shorts_custom_backend_url');
-    }
+    try {
+      if (isValidHttpUrl(url)) {
+        localStorage.setItem('shorts_custom_backend_url', url!.trim().replace(/\/$/, ''));
+      } else {
+        localStorage.removeItem('shorts_custom_backend_url');
+      }
+    } catch (e) {}
   }
 }
 

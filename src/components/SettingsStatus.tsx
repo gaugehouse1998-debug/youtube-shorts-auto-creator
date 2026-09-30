@@ -21,6 +21,7 @@ import {
   getEffectiveApiBaseUrl,
   setCustomBackendUrl,
   DEFAULT_PRODUCTION_BACKEND_URL,
+  isValidHttpUrl,
   api,
 } from '../services/api.ts';
 
@@ -45,7 +46,7 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
 
   useEffect(() => {
     const effective = getEffectiveApiBaseUrl();
-    const finalUrl = effective || DEFAULT_PRODUCTION_BACKEND_URL;
+    const finalUrl = (isValidHttpUrl(effective) ? effective : '') || DEFAULT_PRODUCTION_BACKEND_URL;
     setCurrentBackendUrl(finalUrl);
     setInputBackendUrl(finalUrl);
   }, []);
@@ -61,10 +62,13 @@ export const SettingsStatus: React.FC<SettingsStatusProps> = ({
       ? `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`
       : 'https://gaugehouse1998-debug.github.io/youtube-shorts-auto-creator';
 
-  const backendUrl = currentBackendUrl || DEFAULT_PRODUCTION_BACKEND_URL;
+  const backendUrl =
+    isValidHttpUrl(currentBackendUrl)
+      ? currentBackendUrl
+      : DEFAULT_PRODUCTION_BACKEND_URL;
 
   const redirectUri =
-    status?.youtubeOAuth?.redirectUri && status.youtubeOAuth.redirectUri.startsWith('http')
+    status?.youtubeOAuth?.redirectUri && isValidHttpUrl(status.youtubeOAuth.redirectUri)
       ? status.youtubeOAuth.redirectUri
       : `${backendUrl.replace(/\/$/, '')}/api/youtube/callback`;
 

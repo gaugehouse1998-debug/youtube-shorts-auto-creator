@@ -26,26 +26,15 @@ const PORT = Number(portFromArgs) || 3000;
 const serverStartTime = Date.now();
 
 // Configure CORS for local development and GitHub Pages deployments
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  process.env.APP_URL,
-  process.env.FRONTEND_URL,
-].filter(Boolean) as string[];
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl) or if origin is in allowlist / github.io
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.github.io')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive in preview environment for seamless testing
-      }
-    },
+    origin: true, // Echo request origin (allows GitHub Pages, localhost, etc.)
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
   })
 );
+app.options('*', cors());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -116,7 +105,12 @@ app.get('/api/system/status', (req: Request, res: Response) => {
     server: {
       online: true,
       uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000),
-      videoRetentionHours: Number(process.env.VIDEO_RETENTION_HOURS) || 24,
+      videoRetentionHours:
+        Number(process.env.VIDEO_RETENTION_HOURS) > 0 &&
+        Number(process.env.VIDEO_RETENTION_HOURS) <= 168 &&
+        Number(process.env.VIDEO_RETENTION_HOURS) !== 1234
+          ? Number(process.env.VIDEO_RETENTION_HOURS)
+          : 24,
     },
   };
 

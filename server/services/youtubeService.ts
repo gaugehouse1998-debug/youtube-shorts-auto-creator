@@ -43,8 +43,9 @@ export class YouTubeService {
       return explicit;
     }
     const appUrl = (
-      process.env.APP_URL ||
-      'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app'
+      process.env.APP_URL && (process.env.APP_URL.startsWith('http://') || process.env.APP_URL.startsWith('https://'))
+        ? process.env.APP_URL
+        : 'https://ais-dev-hmzxjhb6oabtwfvt7amhpw-743842357149.asia-east1.run.app'
     ).trim().replace(/\/$/, '');
     return `${appUrl}/api/youtube/callback`;
   }
